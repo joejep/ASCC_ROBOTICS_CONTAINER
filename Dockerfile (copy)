@@ -1,0 +1,51 @@
+FROM nvidia/cuda:12.3.2-cudnn9-devel-ubuntu20.04
+
+RUN apt-key adv --fetch-keys "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub"
+RUN apt-get update && apt-get install -y sudo wget kmod
+ARG nvidia_binary_version="545.29.06"
+
+ARG DEBIAN_FRONTEND=noninteractive
+#RUN https://us.download.nvidia.com/tesla/545.29.06/NVIDIA-Linux-x86_64-545.29.06.run
+ARG nvidia_binary="NVIDIA-Linux-x86_64-${nvidia_binary_version}.run"
+RUN wget -q https://download.nvidia.com/XFree86/Linux-x86_64/${nvidia_binary_version}/${nvidia_binary}
+#UN wget -q https://us.download.nvidia.com/tesla/${nvidia_binary_version}/${nvidia_binary}
+RUN chmod +x ${nvidia_binary}
+RUN ./${nvidia_binary} --accept-license --ui=none --no-kernel-module --no-questions &&  rm -rf ${nvidia_binary}
+RUN apt-get update
+
+
+# Install ROS Noetic
+RUN apt-get update && apt-get install -y curl
+
+RUN apt-get update && apt-get install -y locales && rm -rf /var/lib/apt/lists/* \
+    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+ENV LANG en_US.UTF-8
+
+
+RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list'
+RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
+RUN apt-get update && apt-get install -y ros-noetic-rviz
+
+# Install X11 and GUI dependencies
+RUN apt-get install -y \
+    x11-apps \
+    mesa-utils \
+    libgl1-mesa-glx \
+    libgl1-mesa-dri \
+    xauth \
+    dbus-x11 \
+    libxcb-xinerama0 \
+    libxcb-icccm4 \
+    libxcb-image0 \
+    libxcb-keysyms1 \
+    libxcb-render-util0 \
+    libxcb-shape0 \
+    libxcb-xkb1
+
+# Set environment variables
+ENV DISPLAY=:0
+ENV QT_X11_NO_MITSHM=1
+ENV QT_DEBUG_PLUGINS=1
+ENV QT_QPA_PLATFORM=xcb
+
+CMD ["bash"]

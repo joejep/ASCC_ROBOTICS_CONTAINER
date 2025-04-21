@@ -1,0 +1,59 @@
+# version: "3.8"
+# services:
+#   ascc_container:
+#     tty: true
+#     environment:
+#       - ROS_MASTER_URI=http://localhost:11311
+#       - PYTHONUNBUFFERED=1
+#       - DISPLAY                     # GUI related
+#       - QT_X11_NO_MITSHM=1  
+#       - XAUTHORITY=/tmp/.docker.xauth        # GUI related
+#       - NVIDIA_VISIBLE_DEVICES=all   # GUI related
+#       - NVIDIA_DRIVER_CAPABILITIES=all  # GUI related
+#     ports:
+#       - "7007:7007"
+#     privileged: true                # Required for GPU/X11
+#     network_mode: host              # Critical for ROS
+#     volumes:
+#       - '$HOME/git/docker/docker_cat_ws:/docker_cat_ws'
+#       - '$HOME/.Xauthority:/root/.Xauthority:rw'
+#       - /tmp/.docker.xauth:/tmp/.docker.xauth:rw
+#       - '/tmp/.X11-unix:/tmp/.X11-unix'
+#     devices:
+#       - '/dev/dri:/dev/dri'         # GPU access
+#     build:
+#       context: .
+
+version: "3.8"
+services:
+  ascc_container:
+    container_name: ascc_robotics
+    tty: true
+    environment:
+      - ROS_MASTER_URI=http://localhost:11311
+      - PYTHONUNBUFFERED=1
+      - DISPLAY                     # GUI related
+      - QT_X11_NO_MITSHM=1  
+      - XAUTHORITY=/tmp/.docker.xauth        # GUI related
+      - NVIDIA_VISIBLE_DEVICES=all   # GUI related
+      - NVIDIA_DRIVER_CAPABILITIES=all  # GUI related
+    ports:
+      - "7007:7007"
+    privileged: true                # Enables full host device access (like --privileged)
+    network_mode: host              # Critical for ROS
+    volumes:
+      # - ./src:/ASCC_CONTAINER/src
+      - '$HOME/git/docker/docker_cat_ws:/docker_cat_ws'
+      - '$HOME/.Xauthority:/root/.Xauthority:rw'
+      - /tmp/.docker.xauth:/tmp/.docker.xauth:rw
+      - '/tmp/.X11-unix:/tmp/.X11-unix'
+      - '/dev:/dev'                 # Mounts the entire /dev directory (like -v /dev:/dev)
+    devices:
+      - '/dev/dri:/dev/dri'         # GPU access (redundant if /dev is mounted, but keeps explicit control)
+    build:
+      context: .
+      
+      
+      
+      
+

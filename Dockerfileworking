@@ -1,0 +1,215 @@
+FROM nvidia/cuda:12.3.2-cudnn9-devel-ubuntu20.04
+
+RUN apt-key adv --fetch-keys "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub"
+RUN apt-get update && apt-get install -y sudo wget kmod
+ARG nvidia_binary_version="545.29.06"
+
+# Set environment variables
+ENV DISPLAY=:0
+ENV QT_X11_NO_MITSHM=1
+ENV QT_DEBUG_PLUGINS=1
+ENV QT_QPA_PLATFORM=xcb
+
+ARG DEBIAN_FRONTEND=noninteractive
+#RUN https://us.download.nvidia.com/tesla/545.29.06/NVIDIA-Linux-x86_64-545.29.06.run
+ARG nvidia_binary="NVIDIA-Linux-x86_64-${nvidia_binary_version}.run"
+RUN wget -q https://download.nvidia.com/XFree86/Linux-x86_64/${nvidia_binary_version}/${nvidia_binary}
+#UN wget -q https://us.download.nvidia.com/tesla/${nvidia_binary_version}/${nvidia_binary}
+RUN chmod +x ${nvidia_binary}
+RUN ./${nvidia_binary} --accept-license --ui=none --no-kernel-module --no-questions &&  rm -rf ${nvidia_binary}
+RUN apt-get update
+
+
+# Install ROS Noetic
+RUN apt-get update && apt-get install -y curl
+
+RUN apt-get update && apt-get install -y locales && rm -rf /var/lib/apt/lists/* \
+    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+ENV LANG en_US.UTF-8
+
+
+RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list'
+RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
+RUN apt update && \
+    apt install -y \
+        python-tk \
+        build-essential \
+        ros-noetic-joy \
+        ros-noetic-tf2-sensor-msgs \
+        ros-noetic-rosbash \
+        ros-noetic-rviz \
+        ros-noetic-teleop-twist-joy \
+        ros-noetic-teleop-twist-keyboard \
+        ros-noetic-laser-proc \
+        ros-noetic-rgbd-launch \
+        ros-noetic-depthimage-to-laserscan \
+        ros-noetic-rosserial-arduino \
+        ros-noetic-rosserial-python \
+        ros-noetic-rosserial-server \
+        ros-noetic-rosserial-client \
+        ros-noetic-rosserial-msgs \
+        ros-noetic-amcl \
+        ros-noetic-map-server \
+        ros-noetic-move-base \
+        ros-noetic-urdf \
+        ros-noetic-robot-state-publisher \
+        ros-noetic-xacro \
+        ros-noetic-compressed-image-transport \
+        ros-noetic-rqt-image-view \
+        ros-noetic-gmapping \
+        ros-noetic-navigation \
+        ros-noetic-interactive-markers \
+        ros-noetic-realsense2-camera \
+        tmux wget nano
+
+ RUN apt-get update && \
+        apt-get install -y --no-install-recommends \
+            software-properties-common \
+            git \
+            build-essential \
+            libglew-dev\
+            cmake \
+            wget\
+            libeigen3-dev \
+            libepoxy-dev\
+            ninja-build \
+            ros-noetic-hector-trajectory-server \
+            python3-catkin-tools \
+            libopencv-dev && \
+        rm -rf /var/lib/apt/lists/* && \
+        apt-get clean
+
+
+# Install X11 and GUI dependencies with proper repository setup
+RUN apt-get update && \
+    apt-get install -y \
+        x11-apps \
+        mesa-utils \
+        libgl1-mesa-glx \
+        libgl1-mesa-dri \
+        xauth \
+        dbus-x11 \
+        libxcb-xinerama0 \
+        libxcb-icccm4 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-render-util0 \
+        libxcb-shape0 \
+        libxcb-xkb1 && \
+    rm -rf /var/lib/apt/lists/*
+    
+#RUN pip install rospkg empy
+WORKDIR /home/rover/ASCC_CONTAINER
+    
+
+# Install Pangolin
+RUN git clone https://github.com/stevenlovegrove/Pangolin.git && \
+    cd Pangolin && \
+    mkdir build && cd build && \
+    cmake -DBUILD_PANGOLIN_LIBOPENEXR=OFF .. && \
+    make -j$(nproc) && \
+    make install && \
+    cd ../.. 
+    # rm -rf Pangolin
+    
+RUN apt-get update
+RUN mkdir -p /ASCC_CONTAINER/src  
+
+
+RUN apt-get update
+
+RUN mkdir -p /ASCC_CONTAINER/src  && \
+    cd /ASCC_CONTAINER/src && \
+    git clone https://github.com/thien94/orb_slam3_ros.git && \
+    cd orb_slam3_ros && \
+    # Disable warnings as errors for ORB-SLAM3 compilation
+    find . -name "CMakeLists.txt" -exec sed -i 's/-Werror//g' {} \; && \
+    cd ../.. && \
+    catkin config \
+      --extend /opt/ros/noetic && \
+    catkin build -j2 --no-status
+
+
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+    /bin/bash ~/miniconda.sh -b -p /opt/conda && \
+    rm ~/miniconda.sh && \
+    /opt/conda/bin/conda clean --all --yes && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate base" >> ~/.bashrc
+
+# # Set the PATH to include Conda
+ENV PATH /opt/conda/bin:$PATH
+
+# #INSTALL REALSENSE
+
+
+
+# # Install RealSense SDK and dependencies
+# RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE || \
+#     apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE && \
+#     add-apt-repository "deb https://librealsense.intel.com/Debian/apt-repo $(lsb_release -sc) main" && \
+#     apt-get update && \
+#     apt-get install -y \
+#     librealsense2-dev \
+#     librealsense2-utils \
+#     libssl-dev \
+#     libudev-dev \
+#     libusb-1.0-0-dev && \
+#     rm -rf /var/lib/apt/lists/*
+
+# # Add RealSense udev rules
+# RUN mkdir -p /etc/udev/rules.d/ && \
+#     wget https://raw.githubusercontent.com/IntelRealSense/librealsense/master/config/99-realsense-libusb.rules -O /etc/udev/rules.d/99-realsense-libusb.rules && \
+#     echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="8086", MODE="0666"' >> /etc/udev/rules.d/99-realsense.rules
+
+#     RUN apt-get update
+
+RUN apt-get update
+
+# Create and activate the Conda environment
+RUN conda create -y --name nerfstudio python=3.10 && \
+    echo "conda activate nerfstudio" >> ~/.bashrc
+
+COPY . .
+
+RUN apt-get update
+
+RUN  git clone -b ros1 https://github.com/javieryu/nerf_bridge.git &&\
+    cd nerf_bridge &&\
+    pip install -U --no-cache-dir gdown --pre && \
+    gdown "https://drive.google.com/u/1/uc?id=1-7x7qQfB7bIw2zV4Lr6-yhvMpjXC84Q5&confirm=t" && \
+    conda init bash && \
+    eval "$($(which conda) shell.bash hook)" && \
+    conda activate nerfstudio && \
+    pip install nerfstudio==0.3.4 && \
+    pip uninstall torch torchvision torchaudio -y && \
+    cd .. && \
+    bash script_edit.sh && \
+    python --version &&\
+    
+    
+    
+    ##################################################################
+    #pip install tinycudann-1.7-cp310-cp310-linux_x86_64.whl
+    pip install rospkg &&\
+    pip install torchvision==0.14.1 &&\
+    pip install numpy==1.26.4&&\
+    pip install rawpy==0.20&&\
+    pip install tyro==0.5.3
+    
+    
+    
+
+# # Create and activate the Conda environment
+# RUN conda create -y --name nerfstudio python=3.10 && \
+#     echo "conda activate nerfstudio" >> ~/.bashrc
+
+# COPY . .
+
+# Setup entrypoint
+COPY entrypoint.sh /
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["bash"]
